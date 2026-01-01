@@ -15,10 +15,14 @@ output wire        reg_write_out
 );
 
     // ---------- PC ----------
+    // ---------- PC ----------
     wire [31:0] pc;
+    reg [31:0] pc_next;
+    
     pc PC0 (
         .clk(clk),
         .reset(reset),
+        .pc_next(pc_next),
         .pc(pc)
     );
 
@@ -40,6 +44,14 @@ output wire        reg_write_out
 
     // I-type immediate (sign-extended)
     wire [31:0] imm_i = {{20{instr[31]}}, instr[31:20]};
+
+    // B-type immediate (sign-extended, shifted left by 1)
+    wire [31:0] imm_b = {{19{instr[31]}},
+                         instr[31],
+                         instr[7],
+                         instr[30:25],
+                         instr[11:8],
+                         1'b0};
 
     // ---------- Register file ----------
     wire [31:0] rd1, rd2;
@@ -82,13 +94,58 @@ output wire        reg_write_out
 
             // R-type (ADD): opcode = 0110011, funct3==000 and funct7==0000000
             7'b0110011: begin
+                //ADD
                 if (funct3 == 3'b000 && funct7 == 7'b0000000) begin
                     alu_out_r   = rd1 + rd2;
                     reg_write_r = 1'b1;
-                end else begin
+                end 
+                //SUB
+                else if (funct3 == 3'b000 && funct7 == 7'b0100000) begin
+                    alu_out_r   = rd1 - rd2;
+                    reg_write_r = 1'b1;
+                end
+                //AND
+                else if (funct3 == 3'b111 && funct7 == 7'b0000000) begin
+                    alu_out_r   = rd1 & rd2;
+                    reg_write_r = 1'b1;
+                end
+                //OR
+                else if (funct3 == 3'b110 && funct7 == 7'b0000000) begin
+                    alu_out_r   = rd1 | rd2;
+                    reg_write_r = 1'b1;
+                end
+                //XOR
+                else if (funct3 == 3'b100 && funct7 == 7'b0000000) begin
+                    alu_out_r   = rd1 ^ rd2;
+                    reg_write_r = 1'b1;
+                end
+                //SLL
+                else if (funct3 == 3'b001 && funct7 == 7'b0000000) begin
+                    alu_out_r   = rd1 << rd2;
+                    reg_write_r = 1'b1;
+                end
+                //SRL
+                else if (funct3 == 3'b101 && funct7 == 7'b0000000) begin
+                    alu_out_r   = rd1 >> rd2;
+                    reg_write_r = 1'b1;
+                end
+                //SRA
+                else if (funct3 == 3'b101 && funct7 == 7'b0100000) begin
+                    alu_out_r   = $signed(rd1) >>> rd2[4:0];
+                    reg_write_r = 1'b1;
+                end
+                 else begin
                     alu_out_r   = 32'd0;
                     reg_write_r = 1'b0;
                 end
+            end
+            7'b1100011: begin
+            // BEQ
+            if (funct3 == 3'b000) begin
+                if (rd1 == rd2)
+                    pc_next = pc + imm_b;
+                end
+                reg_write_r = 1'b0;
             end
 
             default: begin
