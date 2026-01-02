@@ -140,10 +140,16 @@ output wire        reg_write_out
                 end
             end
             7'b1100011: begin
-            // BEQ
-            if (funct3 == 3'b000) begin
-                if (rd1 == rd2)
-                    pc_next = pc + imm_b;
+                // BEQ
+                if (funct3 == 3'b000) begin
+                    if (rd1 == rd2)
+                        pc_next = pc + imm_b;
+                end
+                
+                //BNE
+                else if (funct3 == 3'b001) begin
+                    if (rd1 != rd2)
+                        pc_next = pc + imm_b;
                 end
                 reg_write_r = 1'b0;
             end
