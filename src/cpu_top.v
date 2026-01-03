@@ -1,24 +1,81 @@
 // cpu_top.v
 `timescale 1ns / 1ps
+
 module cpu_top(
     input  wire        clk,
     input  wire        reset,
-    output wire [31:0] x1,    // exposed for easy debug
+    output wire [31:0] x1,
     output wire [31:0] x2,
     output wire [31:0] x3,
     output wire [31:0] pc_out,
-output wire [31:0] instr_out,
-output wire [31:0] alu_out,
-output wire        reg_write_out
-
-    
+    output wire [31:0] instr_out,
+    output wire [31:0] alu_out,
+    output wire        reg_write_out
 );
 
-    // ---------- PC ----------
-    // ---------- PC ----------
+    // =====================================================
+    // 1. SIGNAL DECLARATIONS
+    // =====================================================
+
+    // PC
     wire [31:0] pc;
-    reg [31:0] pc_next;
+    reg  [31:0] pc_next;
+
+    // Instruction
+    wire [31:0] instr;
+
+    // Decode fields
+    wire [6:0] opcode = instr[6:0];
+    wire [2:0] funct3 = instr[14:12];
+    wire [6:0] funct7 = instr[31:25];
+    wire [4:0] rd     = instr[11:7];
+    wire [4:0] rs1    = instr[19:15];
+    wire [4:0] rs2    = instr[24:20];
+
+    // Immediates
+    wire [31:0] imm_i = {{20{instr[31]}}, instr[31:20]};
+    wire [31:0] imm_b = {{19{instr[31]}},
+                         instr[31],
+                         instr[7],
+                         instr[30:25],
+                         instr[11:8],
+                         1'b0};
+    // S-type immediate (for SW)
+    wire [31:0] imm_s = {{20{instr[31]}},
+                         instr[31:25],
+                         instr[11:7]};
+                         
+    // J-type immediate (for JAL)
+    wire [31:0] imm_j = {{11{instr[31]}},
+                         instr[31],
+                         instr[19:12],
+                         instr[20],
+                         instr[30:21],
+                         1'b0};
+                         
+                         
+
+    // Register file
+    wire [31:0] rd1;
+    wire [31:0] rd2;
+    wire [31:0] write_data;
+    wire reg_write;
+
+    // ALU / control
+    reg  [31:0] alu_out_r;
+    reg         reg_write_r;
+    reg         mem_to_reg;
+
+    // Data memory
+    wire [31:0] mem_read_data;
+    wire mem_write;
+    reg mem_write_r;
     
+    // =====================================================
+    // 2. MODULE INSTANTIATIONS
+    // =====================================================
+
+    // PC
     pc PC0 (
         .clk(clk),
         .reset(reset),
@@ -26,38 +83,13 @@ output wire        reg_write_out
         .pc(pc)
     );
 
-    // ---------- Instruction fetch ----------
-    wire [31:0] instr;
+    // Instruction memory
     instr_mem IMEM (
         .addr(pc),
         .instr(instr)
     );
 
-    // ---------- Decode fields ----------
-    wire [6:0] opcode = instr[6:0];
-    wire [2:0] funct3 = instr[14:12];
-    wire [6:0] funct7 = instr[31:25];
-
-    wire [4:0] rd  = instr[11:7];
-    wire [4:0] rs1 = instr[19:15];
-    wire [4:0] rs2 = instr[24:20];
-
-    // I-type immediate (sign-extended)
-    wire [31:0] imm_i = {{20{instr[31]}}, instr[31:20]};
-
-    // B-type immediate (sign-extended, shifted left by 1)
-    wire [31:0] imm_b = {{19{instr[31]}},
-                         instr[31],
-                         instr[7],
-                         instr[30:25],
-                         instr[11:8],
-                         1'b0};
-
-    // ---------- Register file ----------
-    wire [31:0] rd1, rd2;
-    wire [31:0] write_data;
-    wire        reg_write;
-
+    // Register file
     regfile RF (
         .clk(clk),
         .rs1(rs1),
@@ -69,110 +101,138 @@ output wire        reg_write_out
         .reg_write(reg_write)
     );
 
-    // ---------- Simple ALU & Control (supports ADDI and ADD) ----------
-    // Operation: produce write_data and reg_write combinationally
-    reg [31:0] alu_out_r;
-    reg        reg_write_r;
+    // Data memory
+    data_mem DMEM (
+        .clk(clk),
+        .mem_write(mem_write),
+        .addr(alu_out_r),
+        .write_data(rd2),
+        .read_data(mem_read_data)
+    );
+
+    // =====================================================
+    // 3. CONTROL / DECODE LOGIC
+    // =====================================================
 
     always @(*) begin
-        // defaults
-        alu_out_r    = 32'd0;
-        reg_write_r  = 1'b0;
+        // ---------- defaults ----------
+        alu_out_r   = 32'd0;
+        reg_write_r = 1'b0;
+        mem_to_reg  = 1'b0;
+        pc_next     = pc + 32'd4;
+        mem_write_r = 1'b0;   // default: no memory write
+
 
         case (opcode)
-            // ADDI (I-type): opcode = 0010011, funct3 == 000 for ADDI
+
+            // ADDI
             7'b0010011: begin
                 if (funct3 == 3'b000) begin
                     alu_out_r   = rd1 + imm_i;
                     reg_write_r = 1'b1;
-                end else begin
-                    // other I-type not supported -> no write
-                    alu_out_r   = 32'd0;
-                    reg_write_r = 1'b0;
                 end
             end
 
-            // R-type (ADD): opcode = 0110011, funct3==000 and funct7==0000000
+            // R-type ALU
             7'b0110011: begin
-                //ADD
                 if (funct3 == 3'b000 && funct7 == 7'b0000000) begin
-                    alu_out_r   = rd1 + rd2;
+                    alu_out_r   = rd1 + rd2; // ADD
                     reg_write_r = 1'b1;
-                end 
-                //SUB
-                else if (funct3 == 3'b000 && funct7 == 7'b0100000) begin
-                    alu_out_r   = rd1 - rd2;
+                end else if (funct3 == 3'b000 && funct7 == 7'b0100000) begin
+                    alu_out_r   = rd1 - rd2; // SUB
                     reg_write_r = 1'b1;
-                end
-                //AND
-                else if (funct3 == 3'b111 && funct7 == 7'b0000000) begin
-                    alu_out_r   = rd1 & rd2;
+                end else if (funct3 == 3'b111) begin
+                    alu_out_r   = rd1 & rd2; // AND
                     reg_write_r = 1'b1;
-                end
-                //OR
-                else if (funct3 == 3'b110 && funct7 == 7'b0000000) begin
-                    alu_out_r   = rd1 | rd2;
+                end else if (funct3 == 3'b110) begin
+                    alu_out_r   = rd1 | rd2; // OR
                     reg_write_r = 1'b1;
-                end
-                //XOR
-                else if (funct3 == 3'b100 && funct7 == 7'b0000000) begin
-                    alu_out_r   = rd1 ^ rd2;
+                end else if (funct3 == 3'b100) begin
+                    alu_out_r   = rd1 ^ rd2; // XOR
                     reg_write_r = 1'b1;
-                end
-                //SLL
-                else if (funct3 == 3'b001 && funct7 == 7'b0000000) begin
-                    alu_out_r   = rd1 << rd2;
+                end else if (funct3 == 3'b001) begin
+                    alu_out_r   = rd1 << rd2[4:0]; // SLL
                     reg_write_r = 1'b1;
-                end
-                //SRL
-                else if (funct3 == 3'b101 && funct7 == 7'b0000000) begin
-                    alu_out_r   = rd1 >> rd2;
+                end else if (funct3 == 3'b101 && funct7 == 7'b0000000) begin
+                    alu_out_r   = rd1 >> rd2[4:0]; // SRL
                     reg_write_r = 1'b1;
-                end
-                //SRA
-                else if (funct3 == 3'b101 && funct7 == 7'b0100000) begin
-                    alu_out_r   = $signed(rd1) >>> rd2[4:0];
+                end else if (funct3 == 3'b101 && funct7 == 7'b0100000) begin
+                    alu_out_r   = $signed(rd1) >>> rd2[4:0]; // SRA
                     reg_write_r = 1'b1;
-                end
-                 else begin
-                    alu_out_r   = 32'd0;
-                    reg_write_r = 1'b0;
                 end
             end
+
+            // BEQ / BNE
             7'b1100011: begin
-                // BEQ
-                if (funct3 == 3'b000) begin
+                if (funct3 == 3'b000) begin // BEQ
                     if (rd1 == rd2)
                         pc_next = pc + imm_b;
-                end
-                
-                //BNE
-                else if (funct3 == 3'b001) begin
+                end else if (funct3 == 3'b001) begin // BNE
                     if (rd1 != rd2)
                         pc_next = pc + imm_b;
                 end
                 reg_write_r = 1'b0;
             end
 
-            default: begin
-                alu_out_r   = 32'd0;
-                reg_write_r = 1'b0;
+            // LW
+            7'b0000011: begin
+                if (funct3 == 3'b010) begin
+                    alu_out_r   = rd1 + imm_i; // address
+                    reg_write_r = 1'b1;
+                    mem_to_reg  = 1'b1;
+                end
             end
+            //SW
+            7'b0100011: begin   // STORE instructions
+                if (funct3 == 3'b010) begin // SW
+                    alu_out_r    = rd1 + imm_s;  // address calculation
+                    mem_write_r = 1'b1;          // enable memory write
+                    reg_write_r = 1'b0;          // no register write
+                    mem_to_reg  = 1'b0;          // irrelevant, but safe
+                end
+            end
+            //JAL
+            7'b1101111: begin
+                alu_out_r   = pc + 32'd4;   
+                reg_write_r = 1'b1;         
+                mem_to_reg  = 1'b0;         
+                pc_next     = pc + imm_j;   
+            end
+            
+            //JALR
+            7'b1100111: begin
+                if (funct3 == 000) begin
+                    alu_out_r   = pc + 32'd4;   
+                    reg_write_r = 1'b1;         
+                    mem_to_reg  = 1'b0;         
+                    pc_next     = (rd1 + imm_i) & ~32'd1;   
+                end
+            end
+            
+
         endcase
     end
 
-    // outputs from combinational logic
-    assign write_data = alu_out_r;
-    assign reg_write  = reg_write_r;
+    // =====================================================
+    // 4. WRITEBACK / FIXED ASSIGNS
+    // =====================================================
 
-    // ---------- Expose registers for debug ----------
-    // Allow easy waveform/console check: x1,x2,x3
+    assign write_data = mem_to_reg ? mem_read_data : alu_out_r;
+    assign reg_write  = reg_write_r;
+    assign mem_write = mem_write_r;
+
+
+    // =====================================================
+    // 5. DEBUG OUTPUTS
+    // =====================================================
+
     assign x1 = RF.regs[1];
     assign x2 = RF.regs[2];
     assign x3 = RF.regs[3];
-assign pc_out        = pc;
-assign instr_out     = instr;
-assign alu_out       = alu_out_r;
-assign reg_write_out = reg_write_r;
+
+    assign pc_out        = pc;
+    assign instr_out     = instr;
+    assign alu_out       = alu_out_r;
+    assign reg_write_out = reg_write_r;
 
 endmodule
