@@ -1,36 +1,40 @@
 # RISC-V RV32I Single-Cycle CPU (Verilog)
 
-This project is a single-cycle RISC-V (RV32I) CPU core implemented from scratch in Verilog. The goal is to gain a deep, practical understanding of how a real instruction set architecture maps to hardware datapath and control logic.
+This project is a complete single-cycle implementation of a RISC-V RV32I CPU core written from scratch in Verilog.  
+The objective of this project is to understand how a real instruction set architecture maps to hardware datapath and control logic at the RTL level.
 
-The design emphasizes correctness, clarity, and architectural understanding rather than performance optimizations or pipelining.
+The design prioritizes correctness and architectural clarity over performance optimizations such as pipelining.
 
 ---
 
-## Implemented Features
+## Instruction Support (RV32I)
 
-### Instruction Support (RV32I subset)
-
-#### Arithmetic and Logical (Register and Immediate)
+### Arithmetic and Logical (Register)
 - ADD, SUB
 - AND, OR, XOR
 - SLL, SRL, SRA
-- ADDI
 
-#### Memory Access
+### Arithmetic and Logical (Immediate)
+- ADDI
+- ANDI, ORI, XORI
+- SLTI, SLTIU
+
+### Memory Access
 - LW (Load Word)
 - SW (Store Word)
 
-#### Control Flow
-- BEQ (Branch if Equal)
-- BNE (Branch if Not Equal)
-- BLT (Branch if Less Than, signed)
-- BGE (Branch if Greater or Equal, signed)
-- BLTU (Branch if Less Than, unsigned)
-- BGEU (Branch if Greater or Equal, unsigned)
+### Control Flow
+- BEQ, BNE
+- BLT, BGE (signed)
+- BLTU, BGEU (unsigned)
 - JAL (Jump and Link)
 - JALR (Jump and Link Register)
 
-All branch and jump instructions correctly update the program counter and follow the RISC-V specification.
+### Upper Immediate Instructions
+- LUI (Load Upper Immediate)
+- AUIPC (Add Upper Immediate to PC)
+
+All listed instructions follow the RV32I specification and execute in a single clock cycle.
 
 ---
 
@@ -39,24 +43,20 @@ All branch and jump instructions correctly update the program counter and follow
 - Single-cycle datapath
 - Separate instruction memory and data memory
 - 32 × 32-bit register file
-- ALU supporting arithmetic, logical, and shift operations
+- ALU supporting arithmetic, logical, shift, and comparison operations
 - Program Counter (PC) with support for sequential execution, branches, and jumps
 - Write-back selection between ALU results and memory data
-- Immediate decoding implemented for:
-  - I-type
-  - S-type
-  - B-type
-  - J-type
+- Immediate decoding implemented for I, S, B, U, and J instruction formats
 
 ---
 
-## Design Overview
+## Design Details
 
-- Instruction decoding based on opcode, funct3, and funct7 fields
+- Instruction decoding using opcode, funct3, and funct7 fields
 - Control logic implemented using combinational always blocks
 - PC updated synchronously with branch and jump resolution
-- Branch comparisons implemented for both signed and unsigned operands
-- No pipelining; each instruction completes in a single cycle
+- Signed and unsigned comparisons handled explicitly
+- No pipelining; each instruction completes in one cycle
 
 ---
 
@@ -66,14 +66,29 @@ The CPU is verified using a self-written Verilog testbench and waveform-based si
 
 Verification includes:
 - Correct instruction fetch and decode
-- Proper ALU execution and register write-back
-- Functional load and store operations
-- Correct branch and jump behavior (PC control)
+- Correct ALU operation and register write-back
+- Functional load and store behavior
+- Correct branch and jump control
 - Validation of control signals such as reg_write, mem_write, and mem_to_reg
 
-Key signals are observed directly in the waveform to validate datapath and control flow behavior.
+Key datapath and control signals are observed directly in simulation waveforms.
 
 ---
 
-## Project Structure
+## Tools Used
+- Verilog HDL
+- Xilinx Vivado (simulation and waveform analysis)
 
+---
+
+## Project Status
+
+This project represents a complete single-cycle RV32I CPU implementation and is considered feature-complete.
+
+Further enhancements such as pipelining, hazard handling, or exception support are intentionally excluded and would be explored as separate projects.
+
+## Verification Waveform
+
+The following waveform demonstrates correct instruction execution, PC updates, ALU operation, and control signal behavior for the single-cycle RV32I CPU.
+
+![Waveform Verification](docs/waveform_verification.png)

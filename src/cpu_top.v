@@ -52,7 +52,8 @@ module cpu_top(
                          instr[20],
                          instr[30:21],
                          1'b0};
-                         
+    // U-type immediate (LUI / AUIPC)
+    wire [31:0] imm_u = {instr[31:12], 12'b0};                   
                          
 
     // Register file
@@ -125,10 +126,25 @@ module cpu_top(
 
         case (opcode)
 
-            // ADDI
+            
             7'b0010011: begin
-                if (funct3 == 3'b000) begin
+                if (funct3 == 3'b000) begin // ADDI
                     alu_out_r   = rd1 + imm_i;
+                    reg_write_r = 1'b1;
+                end else if (funct3 == 3'b111) begin //ANDI
+                    alu_out_r   = rd1 & imm_i;
+                    reg_write_r = 1'b1;
+                end else if (funct3 == 3'b110) begin //ORI
+                    alu_out_r   = rd1 | imm_i;
+                    reg_write_r = 1'b1;
+                end else if (funct3 == 3'b100) begin //XORI
+                    alu_out_r   = rd1 ^ imm_i;
+                    reg_write_r = 1'b1;
+                end else if (funct3 == 3'b010) begin //SLTI
+                    alu_out_r   = ($signed(rd1) < $signed(imm_i)) ? 32'd1 : 32'd0;
+                    reg_write_r = 1'b1;
+                end else if (funct3 == 3'b011) begin //SLTIU
+                    alu_out_r   = (rd1 < imm_i) ? 32'd1 : 32'd0;
                     reg_write_r = 1'b1;
                 end
             end
@@ -219,6 +235,17 @@ module cpu_top(
                     mem_to_reg  = 1'b0;         
                     pc_next     = (rd1 + imm_i) & ~32'd1;   
                 end
+            end
+            
+            //LUI
+            7'b0110111: begin   // LUI
+                alu_out_r   = imm_u;
+                reg_write_r = 1'b1;
+            end
+            
+            7'b0010111: begin   // AUIPC
+                alu_out_r   = pc + imm_u;
+                reg_write_r = 1'b1;
             end
             
 
