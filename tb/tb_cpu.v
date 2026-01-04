@@ -6,7 +6,7 @@ module tb_cpu_top;
     reg clk;
     reg reset;
 
-    // Outputs from cpu_top (already ports)
+    // Outputs from CPU (ports)
     wire [31:0] x1;
     wire [31:0] x2;
     wire [31:0] x3;
@@ -29,23 +29,23 @@ module tb_cpu_top;
     );
 
     // -------------------------------------------------
-    // INTERNAL SIGNAL VISIBILITY (THIS IS THE KEY PART)
+    // INTERNAL SIGNAL VISIBILITY (branch + ALU + mem)
     // -------------------------------------------------
+    wire [31:0] pc_next     = dut.pc_next;
+    wire [31:0] rd1         = dut.rd1;
+    wire [31:0] rd2         = dut.rd2;
+    wire [31:0] write_data = dut.write_data;
 
-    wire [31:0] pc_next      = dut.pc_next;
-    wire        mem_to_reg   = dut.mem_to_reg;
-    wire        mem_write    = dut.mem_write;
-    wire [31:0] rd1          = dut.rd1;
-    wire [31:0] rd2          = dut.rd2;
-    wire [31:0] write_data  = dut.write_data;
-    wire [6:0]  opcode      = dut.opcode;
-    wire [2:0]  funct3      = dut.funct3;
+    wire        mem_to_reg = dut.mem_to_reg;
+    wire        mem_write  = dut.mem_write;
 
-    // Clock generation (10ns period)
+    wire [6:0]  opcode = dut.opcode;
+    wire [2:0]  funct3 = dut.funct3;
+
+    // Clock generation: 10 ns period
     always #5 clk = ~clk;
 
     initial begin
-        // Init
         clk   = 0;
         reset = 1;
 
@@ -53,15 +53,13 @@ module tb_cpu_top;
         #20;
         reset = 0;
 
-        // Run long enough for full program
-        #400;
+        // Run long enough for branches + jumps + immediates
+        #600;
 
         $finish;
     end
 
-    // -------------------------------------------------
-    // AUTOMATIC WAVEFORM DUMP
-    // -------------------------------------------------
+    // Optional waveform dump (for non-Vivado simulators)
     initial begin
         $dumpfile("cpu_waveform.vcd");
         $dumpvars(0, tb_cpu_top);

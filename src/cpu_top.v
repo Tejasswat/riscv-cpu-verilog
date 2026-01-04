@@ -162,7 +162,7 @@ module cpu_top(
                 end
             end
 
-            // BEQ / BNE
+            // BEQ / BNE / BLT
             7'b1100011: begin
                 if (funct3 == 3'b000) begin // BEQ
                     if (rd1 == rd2)
@@ -170,6 +170,18 @@ module cpu_top(
                 end else if (funct3 == 3'b001) begin // BNE
                     if (rd1 != rd2)
                         pc_next = pc + imm_b;
+                end else if (funct3 == 3'b100) begin // BLT
+                        if ($signed(rd1) < $signed(rd2))
+                            pc_next = pc + imm_b;
+                end else if (funct3 == 3'b101) begin // BGE
+                        if ($signed(rd1) >= $signed(rd2))
+                            pc_next = pc + imm_b;
+                end else if (funct3 == 3'b110) begin // BLTU
+                        if (rd1 < rd2)
+                            pc_next = pc + imm_b;
+                end else if (funct3 == 3'b111) begin // BGEU
+                        if (rd1 >= rd2)
+                            pc_next = pc + imm_b;
                 end
                 reg_write_r = 1'b0;
             end

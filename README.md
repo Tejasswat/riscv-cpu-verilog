@@ -1,21 +1,18 @@
 # RISC-V RV32I Single-Cycle CPU (Verilog)
 
-A single-cycle RISC-V (RV32I) CPU core implemented from scratch in **Verilog**, designed to understand how a real instruction set architecture maps to actual hardware (datapath + control).
+This project is a single-cycle RISC-V (RV32I) CPU core implemented from scratch in Verilog. The goal is to gain a deep, practical understanding of how a real instruction set architecture maps to hardware datapath and control logic.
 
-This project focuses on **clarity, correctness, and architectural understanding**, not performance or pipelining.
+The design emphasizes correctness, clarity, and architectural understanding rather than performance optimizations or pipelining.
 
 ---
 
-## 🔧 Features Implemented
+## Implemented Features
 
-### ✅ Instruction Support (RV32I subset)
+### Instruction Support (RV32I subset)
 
-#### Arithmetic & Logical
-- ADD
-- SUB
-- AND
-- OR
-- XOR
+#### Arithmetic and Logical (Register and Immediate)
+- ADD, SUB
+- AND, OR, XOR
 - SLL, SRL, SRA
 - ADDI
 
@@ -26,20 +23,26 @@ This project focuses on **clarity, correctness, and architectural understanding*
 #### Control Flow
 - BEQ (Branch if Equal)
 - BNE (Branch if Not Equal)
+- BLT (Branch if Less Than, signed)
+- BGE (Branch if Greater or Equal, signed)
+- BLTU (Branch if Less Than, unsigned)
+- BGEU (Branch if Greater or Equal, unsigned)
 - JAL (Jump and Link)
 - JALR (Jump and Link Register)
 
+All branch and jump instructions correctly update the program counter and follow the RISC-V specification.
+
 ---
 
-### ✅ CPU Architecture
+## CPU Architecture
 
-- **Single-cycle datapath**
-- Separate **instruction memory** and **data memory**
-- Register file with 32 × 32-bit registers
+- Single-cycle datapath
+- Separate instruction memory and data memory
+- 32 × 32-bit register file
 - ALU supporting arithmetic, logical, and shift operations
-- Proper **PC control** (`pc + 4`, branches, jumps)
-- Write-back mux (`ALU result` vs `memory data`)
-- Immediate decoding for:
+- Program Counter (PC) with support for sequential execution, branches, and jumps
+- Write-back selection between ALU results and memory data
+- Immediate decoding implemented for:
   - I-type
   - S-type
   - B-type
@@ -47,40 +50,30 @@ This project focuses on **clarity, correctness, and architectural understanding*
 
 ---
 
-## 🧠 Design Highlights
+## Design Overview
 
-- Instruction decoding using `opcode`, `funct3`, and `funct7`
-- Clean separation of:
-  - Fetch
-  - Decode
-  - Execute
-  - Memory
-  - Write-back
-- Control logic implemented using combinational `always @(*)` blocks
-- PC updated synchronously with support for branches and jumps
-- Verified through waveform-based simulation
+- Instruction decoding based on opcode, funct3, and funct7 fields
+- Control logic implemented using combinational always blocks
+- PC updated synchronously with branch and jump resolution
+- Branch comparisons implemented for both signed and unsigned operands
+- No pipelining; each instruction completes in a single cycle
 
 ---
 
-## 🧪 Verification
+## Verification
 
-The CPU is verified using a custom **Verilog testbench** and simulation in **Xilinx Vivado**.
+The CPU is verified using a self-written Verilog testbench and waveform-based simulation in Xilinx Vivado.
 
-Waveforms demonstrate:
+Verification includes:
 - Correct instruction fetch and decode
-- Proper ALU operations
-- Correct register write-back
-- Functional load/store behavior
-- Correct branch and jump control (`BEQ`, `JAL`, `JALR`)
+- Proper ALU execution and register write-back
+- Functional load and store operations
+- Correct branch and jump behavior (PC control)
+- Validation of control signals such as reg_write, mem_write, and mem_to_reg
 
-Key signals observed:
-- `pc_out`, `pc_next`
-- `instr_out`
-- `rd1`, `rd2`, `alu_out`
-- `reg_write`, `mem_to_reg`, `mem_write`
-- Architectural registers (`x1`, `x2`, `x3`, …)
+Key signals are observed directly in the waveform to validate datapath and control flow behavior.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
